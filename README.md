@@ -7,7 +7,7 @@ Send Claude a prompt, walk away, and your Mac tells you when the reply is ready.
 - **Announce** (on by default): "Claude has responded to chat titled *Lisbon trip plan*." If Claude asked you something, it adds "It needs your input."
 - **Read aloud** (off by default): reads the reply, and any questions Claude asked you, in plain spoken sentences. Long replies are shortened for listening; the full text stays in the chat.
 
-It is a community extension for the Claude Desktop app on macOS. It isn't made or endorsed by Anthropic.
+It is a community extension for the Claude Desktop app on macOS, created with Claude (AI-generated; see [Credits](#credits)). It isn't an official Anthropic product.
 
 ![How it works: ask, step away, hear it](assets/how-it-works.png)
 
@@ -73,6 +73,10 @@ npx @anthropic-ai/mcpb@2.1.2 pack . voice-announcer.mcpb
 ```
 
 The tests run on any system with Node 18 or later. Contributions and forks are welcome.
+
+## Credits
+
+**This project is AI-generated.** The code, tests, documentation and visuals were created by Claude (Claude Opus 5.5), Anthropic's AI assistant, in conversation with Kiran Karthik Ponnusamy, who came up with the idea, directed the work, tested it on his Mac and published it. Like any AI-generated code, read it before you rely on it; it's one short file, [`server/index.js`](server/index.js).
 
 ## License
 

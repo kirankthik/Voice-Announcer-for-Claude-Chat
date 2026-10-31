@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
- * Voice Announcer: a small MCP server for Claude Desktop on macOS.
+ * Voice Announcer for Claude Chat: a small MCP server for Claude Desktop on macOS.
+ * AI-generated: written by Claude (Claude Opus 5.5) with Kiran Karthik Ponnusamy.
  *
  * At the end of a reply Claude calls `announce_reply`, and this speaks
  * "Claude has responded to chat titled <title>" and/or reads the reply aloud
@@ -17,7 +18,7 @@ const os = require('node:os');
 const path = require('node:path');
 const readline = require('node:readline');
 
-const SERVER = { name: 'voice-announcer', title: 'Voice Announcer for Claude Chat', version: '1.0.7' };
+const SERVER = { name: 'voice-announcer', title: 'Voice Announcer for Claude Chat', version: '1.0.8' };
 
 // ---------------------------------------------------------------- settings --
 
