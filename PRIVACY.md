@@ -5,6 +5,7 @@ Voice Announcer for Claude Chat runs entirely on your Mac.
 - **Data collection:** none. The extension receives a chat title, a yes/no flag and, if read-aloud is on, the text to speak, each time Claude calls it.
 - **Use and storage:** that text is passed to macOS's built-in `say` command and then discarded. Nothing is written to disk apart from Claude Desktop's own extension logs, which record errors such as a missing voice name, and, if you change a setting by asking Claude, a small settings file in `~/Library/Application Support/Voice Announcer for Claude Chat/`.
 - **Activity check:** while speaking, it reads how long the keyboard and mouse have been idle, to stop when you're back. It never sees what you type or where you click.
+- **Who can hear it:** spoken titles and replies can be heard by anyone near your Mac. Read-aloud is off by default.
 - **Third-party sharing:** none. The extension makes no network requests.
 - **Retention:** nothing you or Claude say is retained. The settings file holds only your settings.
 - **Contact:** open an issue at https://github.com/kirankthik/Voice-Announcer-for-Claude-Chat/issues.

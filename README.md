@@ -56,9 +56,14 @@ The extension is a small [MCP](https://modelcontextprotocol.io) server packaged 
 
 Speech uses the Mac's built-in `say` command and the chime uses `afplay`; speech starts over the end of the chime so there's no gap. While it speaks, it checks the Mac's keyboard and mouse idle time (`ioreg`), which needs no special permission and reads no keystrokes, and stops as soon as you're active. The server is one readable file, [`server/index.js`](server/index.js), with no dependencies.
 
-## Privacy
+## Privacy and safety
 
 Voice Announcer makes no network requests and collects, stores and shares nothing. The text Claude asks it to speak goes only to your Mac's built-in speech engine. See [PRIVACY.md](PRIVACY.md).
+
+- **Anyone nearby can hear it.** Chat titles are spoken, and so are replies if read-aloud is on. Read-aloud is off by default. To keep titles private, change the announcement wording to leave out `{title}`.
+- **No shell, no surprises.** It runs only the Mac's own `say`, `afplay` and `ioreg`, with fixed arguments and never through a shell. Text is passed to `say` on its input, with `say`'s embedded `[[…]]` commands removed.
+- **Checked settings.** Voice names, chime names, numbers and text lengths are checked wherever they come from. Claude can change settings only to known values (it can't point the chime at an arbitrary file), and is told to do so only when you ask.
+- **Readable code, no dependencies.** Everything is in [`server/index.js`](server/index.js).
 
 ## Develop
 

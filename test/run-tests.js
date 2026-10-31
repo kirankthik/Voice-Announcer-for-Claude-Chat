@@ -118,7 +118,7 @@ async function test(name, fn) {
     assert.match(ann.description, /right before you write your final answer/);
     await sleep(400);
     assert.deepEqual(s.calls(), ['SAY args=[] text=[Claude has responded to chat titled Lisbon trip plan]']);
-    assert.match(s.stderr(), /Chime "Glass" not found/); // no macOS sounds on this Linux box
+    assert.match(s.stderr(), /Chime "Glass" isn.t a Mac alert sound/); // no macOS sounds on this Linux box
     assert.match(s.stderr(), /announce=true readReply=false voice=\(system\)/);
     await s.stop();
   });
@@ -301,6 +301,44 @@ async function test(name, fn) {
     const calls = s.calls();
     assert.equal(calls[0], `AFPLAY ${slowChime}`);
     assert.ok(calls.some((c) => c.includes('Quick')), 'speech should start before the chime ends: ' + calls.join(' | '));
+    await s.stop();
+  });
+
+  await test('safety: bad settings refused, say commands stripped, tampered settings file ignored', async () => {
+    const file = path.join(T, 'log-safety-settings.json');
+    fs.rmSync(file, { force: true });
+    const s = start({ VA_CHIME: 'none', VA_READ_REPLY: 'true' }, { settingsFile: file });
+    await handshake(s);
+    const bad = await s.rpc('tools/call', { name: 'voice_settings', arguments: { voice: '-o /tmp/out', chime: '/etc/passwd', rate: 99999 } });
+    const text = bad.result.content[0].text;
+    assert.match(text, /Not changed \(invalid value\): voice, chime/);
+    assert.match(text, /speed: 720/); // clamped, not refused
+    assert.equal((fs.statSync(file).mode & 0o777).toString(8), '600');
+    await s.rpc('tools/call', { name: 'announce_reply', arguments: { chat_title: 'Safe [[volm 0]] title', spoken_text: 'Hello [[rate 1]] there [[inpt PHON]] friend' } });
+    await sleep(600);
+    const calls = s.calls().join('\n');
+    assert.ok(!calls.includes('[['), calls);
+    assert.ok(!calls.includes('-o /tmp/out'), calls);
+    await s.stop();
+
+    // A hand-edited or tampered settings file: wrong types, unknown keys, prototype tricks are ignored.
+    const fromApp = { announce: true, readReply: false, template: 'Claude has responded to chat titled {title}', voice: '', rate: 0, chime: 'none', maxWords: 200, stopOnActivity: true };
+    fs.writeFileSync(file, JSON.stringify({ fromApp, overrides: JSON.parse('{"__proto__":{"polluted":1},"voice":"--evil","readReply":"yes","chime":"/etc/hosts","rate":180}') }));
+    const t2 = start({ VA_CHIME: 'none' }, { settingsFile: file });
+    await handshake(t2);
+    const shown = (await t2.rpc('tools/call', { name: 'voice_settings', arguments: {} })).result.content[0].text;
+    assert.match(shown, /Read the reply aloud: off/);
+    assert.match(shown, /Voice: system voice; speed: 180; chime: none/);
+    await t2.stop();
+  });
+
+  await test('very long input is capped', async () => {
+    const s = start({ VA_CHIME: 'none', VA_READ_REPLY: 'true', VA_MAX_WORDS: '0' });
+    await handshake(s);
+    await s.rpc('tools/call', { name: 'announce_reply', arguments: { chat_title: 'x'.repeat(100000), spoken_text: 'word '.repeat(50000) } });
+    await sleep(800);
+    const longest = Math.max(...s.calls().map((c) => c.length));
+    assert.ok(longest < 21000, `spoke ${longest} characters`);
     await s.stop();
   });
 

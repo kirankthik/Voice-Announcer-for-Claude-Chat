@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "voice-announcer",
   "display_name": "Voice Announcer for Claude Chat",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Hear when Claude finishes: a spoken \"Claude has responded to chat titled …\", and optionally the reply read aloud, on your Mac.",
   "long_description": "Send a prompt, walk away, and your Mac tells you when Claude is done.\n\n- **Announce**: says \"Claude has responded to chat titled …\" (and that it needs your input when Claude asked you something).\n- **Read aloud**: optionally reads the reply, and any questions Claude asked, in plain spoken sentences.\n\nIt uses the Mac's built-in voice (`say`) and alert sounds. Nothing leaves your Mac and there is no network access.\n\n**Changing settings:** click **Save** at the bottom of the settings page (you may need to scroll), or just ask Claude in a chat, for example \"turn read-aloud on\".\n\nAdd one line to your Claude preferences so Claude calls it each time it is about to give you its answer (see the README).",
   "author": {
