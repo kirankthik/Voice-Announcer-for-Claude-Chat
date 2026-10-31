@@ -28,6 +28,7 @@ It is a community extension for the Claude Desktop app on macOS. It isn't made o
 | --- | --- |
 | Announce when Claude replies | Says "Claude has responded to chat titled …" |
 | Read the reply aloud | Then reads the reply itself |
+| Stop when I use the Mac | Stops speaking the moment you press a key, click, or move the mouse or trackpad (on by default) |
 | Announcement wording | Your own wording; `{title}` becomes the chat title |
 | Voice | A Mac voice such as Samantha, Daniel or Karen; blank uses the system voice |
 | Speaking speed | Words per minute; 0 keeps the normal speed |
@@ -40,7 +41,7 @@ To hear the voices your Mac has, run `say -v '?'` in Terminal. Better voices can
 
 - The Mac speaks only while it's awake and Claude Desktop is open.
 - The title is the name Claude gives the chat. It stays the same within a chat but may not match your sidebar exactly.
-- Say "stop talking" in any chat to cut a reading short.
+- Touch the keyboard, mouse or trackpad to stop it mid-sentence, or say "stop talking" in any chat.
 - An unknown voice falls back to the system voice, and an unknown chime is skipped. Both are noted in the extension's logs.
 
 ## How it works
@@ -50,7 +51,7 @@ The extension is a small [MCP](https://modelcontextprotocol.io) server packaged 
 - `announce_reply` queues a chime and the spoken text, and returns at once.
 - `stop_speaking` stops whatever is playing and clears the queue.
 
-Speech uses the Mac's built-in `say` command and the chime uses `afplay`. The server is one readable file, [`server/index.js`](server/index.js), with no dependencies.
+Speech uses the Mac's built-in `say` command and the chime uses `afplay`. While it speaks, it checks the Mac's keyboard and mouse idle time (`ioreg`), which needs no special permission and reads no keystrokes, and stops as soon as you're active. The server is one readable file, [`server/index.js`](server/index.js), with no dependencies.
 
 ## Privacy
 

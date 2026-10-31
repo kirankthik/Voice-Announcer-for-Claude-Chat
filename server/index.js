@@ -15,7 +15,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const readline = require('node:readline');
 
-const SERVER = { name: 'voice-announcer', title: 'Voice Announcer for Claude Chat', version: '1.0.3' };
+const SERVER = { name: 'voice-announcer', title: 'Voice Announcer for Claude Chat', version: '1.0.4' };
 
 // ---------------------------------------------------------------- settings --
 
@@ -47,6 +47,7 @@ const CONFIG = {
   rate: num('VA_RATE', 0, 0, 720),
   chime: str('VA_CHIME', 'Glass'),
   maxWords: num('VA_MAX_WORDS', 200, 0, 5000),
+  stopOnActivity: bool('VA_STOP_ON_ACTIVITY', true),
 };
 
 // Overridable only for testing; Claude Desktop never sets these.
@@ -54,6 +55,8 @@ const SAY = process.env.VA_SAY_BIN || '/usr/bin/say';
 const AFPLAY = process.env.VA_AFPLAY_BIN || '/usr/bin/afplay';
 const CAN_SPEAK = process.platform === 'darwin' || Boolean(process.env.VA_SAY_BIN);
 const MAX_WAITING = 8;
+const IOREG = process.env.VA_IOREG_BIN || '/usr/sbin/ioreg';
+const ACTIVITY_POLL_MS = 250;
 
 // ------------------------------------------------------------ text helpers --
 
@@ -185,9 +188,62 @@ async function chime() {
   await run(AFPLAY, [file], '');
 }
 
+// ------------------------------------------------- stop when the user is active --
+
+/** Milliseconds since the last keyboard, mouse or trackpad input (macOS HIDIdleTime). */
+function idleMs() {
+  return new Promise((resolve) => {
+    let out = '';
+    let child;
+    try {
+      child = spawn(IOREG, ['-c', 'IOHIDSystem'], { stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch {
+      resolve(null);
+      return;
+    }
+    child.stdout.on('data', (d) => (out += d));
+    child.on('error', () => resolve(null));
+    child.on('close', () => {
+      const m = out.match(/"HIDIdleTime"\s*=\s*(\d+)/);
+      resolve(m ? Number(m[1]) / 1e6 : null);
+    });
+  });
+}
+
+/**
+ * While speech plays, checks for new input. Any key press, click, mouse or
+ * trackpad movement after playback began stops it and clears the queue.
+ */
+function watchActivity() {
+  if (!CONFIG.stopOnActivity) return () => {};
+  const started = Date.now();
+  let stopped = false;
+  let warned = false;
+  const tick = async () => {
+    if (stopped) return;
+    const idle = await idleMs();
+    if (stopped) return;
+    if (idle === null) {
+      if (!warned) log("Couldn't read keyboard/mouse activity; speech won't stop on activity.");
+      warned = true;
+    } else if (idle + 150 < Date.now() - started) {
+      log('Stopped speaking: keyboard or mouse activity.');
+      stopAll();
+      return;
+    }
+    timer = setTimeout(tick, ACTIVITY_POLL_MS);
+  };
+  let timer = setTimeout(tick, ACTIVITY_POLL_MS);
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+  };
+}
+
 async function drain() {
   if (busy) return;
   busy = true;
+  const unwatch = watchActivity();
   try {
     while (waiting.length) {
       const job = waiting.shift();
@@ -202,6 +258,7 @@ async function drain() {
       }
     }
   } finally {
+    unwatch();
     busy = false;
   }
 }

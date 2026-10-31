@@ -10,6 +10,7 @@ const SERVER = path.join(__dirname, '..', 'server', 'index.js');
 const T = __dirname;
 const SAY = path.join(T, 'bin/say');
 const AFPLAY = path.join(T, 'bin/afplay');
+const IOREG = path.join(T, 'bin/ioreg');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 fs.writeFileSync(path.join(T, 'Ding.aiff'), 'stand-in chime'); // the chime test plays this file
 
@@ -31,7 +32,7 @@ function start(env, { mocks = true } = {}) {
     env: {
       PATH: process.env.PATH,
       MOCK_LOG: log,
-      ...(mocks ? { VA_SAY_BIN: SAY, VA_AFPLAY_BIN: AFPLAY } : {}),
+      ...(mocks ? { VA_SAY_BIN: SAY, VA_AFPLAY_BIN: AFPLAY, VA_IOREG_BIN: IOREG } : {}),
       ...env,
     },
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -223,6 +224,40 @@ async function test(name, fn) {
     await sleep(400);
     assert.equal(s.calls().at(-1), 'SAY args=[] text=[Done: After stop]');
     await s.stop();
+  });
+
+  await test('a key press or mouse move stops speaking (and the setting can turn that off)', async () => {
+    const idleFile = path.join(T, 'log-idle.txt');
+    fs.writeFileSync(idleFile, '999999');
+    const s = start({ VA_CHIME: 'none', MOCK_IDLE_FILE: idleFile });
+    await handshake(s);
+    await s.rpc('tools/call', { name: 'announce_reply', arguments: { chat_title: 'SLOW one', spoken_text: 'x' } });
+    await s.rpc('tools/call', { name: 'announce_reply', arguments: { chat_title: 'Never spoken', spoken_text: 'x' } });
+    await sleep(700);
+    fs.writeFileSync(idleFile, '0'); // the user just touched the keyboard
+    await sleep(900);
+    let calls = s.calls();
+    assert.ok(calls.some((c) => c.includes('SLOW one')), calls.join('\n'));
+    assert.ok(!calls.some((c) => c.includes('Never spoken')), 'queued item should be cleared');
+    assert.ok(!calls.includes('SAY-FINISHED-SLOW'), 'speech should be cut off');
+    assert.match(s.stderr(), /Stopped speaking: keyboard or mouse activity/);
+    // Activity from before playback started does not stop it.
+    fs.writeFileSync(idleFile, '999999');
+    await s.rpc('tools/call', { name: 'announce_reply', arguments: { chat_title: 'Next', spoken_text: 'x' } });
+    await sleep(500);
+    assert.ok(s.calls().some((c) => c.includes('Next')));
+    await s.stop();
+
+    fs.writeFileSync(idleFile, '999999');
+    const off = start({ VA_CHIME: 'none', MOCK_IDLE_FILE: idleFile, VA_STOP_ON_ACTIVITY: 'false' });
+    await handshake(off);
+    await off.rpc('tools/call', { name: 'announce_reply', arguments: { chat_title: 'SLOW again', spoken_text: 'x' } });
+    await sleep(500);
+    fs.writeFileSync(idleFile, '0');
+    await sleep(800);
+    assert.ok(!/Stopped speaking/.test(off.stderr()), 'should keep speaking when the setting is off');
+    await off.rpc('tools/call', { name: 'stop_speaking', arguments: {} });
+    await off.stop();
   });
 
   await test('both options off: silent, tool says so', async () => {

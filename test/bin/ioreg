@@ -1,0 +1,5 @@
+#!/bin/bash
+# Stand-in for macOS ioreg: reports idle time from $MOCK_IDLE_FILE (milliseconds), or a large value.
+ms=$(cat "${MOCK_IDLE_FILE:-/nonexistent}" 2>/dev/null || echo 999999)
+if [[ "$ms" == "NOW" ]]; then ms=0; fi
+printf '    | |   "HIDIdleTime" = %d\n' $(( ms * 1000000 ))
