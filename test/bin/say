@@ -1,0 +1,9 @@
+#!/bin/bash
+# Mock of macOS `say`: records arguments and the text it was given on stdin (newlines shown as \n).
+args="$*"
+text="$(cat)"
+text="${text//$'\n'/\\n}"
+if [[ "$args" == *"-v BadVoice"* ]]; then echo "Voice \`BadVoice' not found." >&2; exit 1; fi
+printf 'SAY args=[%s] text=[%s]\n' "$args" "$text" >> "${MOCK_LOG:?}"
+if [[ "$text" == *SLOW* ]]; then sleep 5; printf 'SAY-FINISHED-SLOW\n' >> "$MOCK_LOG"; fi
+exit 0

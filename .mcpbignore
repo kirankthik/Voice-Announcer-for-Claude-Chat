@@ -1,0 +1,6 @@
+test/
+assets/
+.git/
+.gitignore
+PRIVACY.md
+voice-announcer.mcpb

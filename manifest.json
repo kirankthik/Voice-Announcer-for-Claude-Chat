@@ -1,0 +1,116 @@
+{
+  "manifest_version": "0.3",
+  "name": "voice-announcer",
+  "display_name": "Voice Announcer for Claude Chat",
+  "version": "1.0.2",
+  "description": "Hear when Claude finishes: a spoken \"Claude has responded to chat titled …\", and optionally the reply read aloud, on your Mac.",
+  "long_description": "Send a prompt, walk away, and your Mac tells you when Claude is done.\n\n- **Announce**: says \"Claude has responded to chat titled …\" (and that it needs your input when Claude asked you something).\n- **Read aloud**: optionally reads the reply, and any questions Claude asked, in plain spoken sentences.\n\nIt uses the Mac's built-in voice (`say`) and alert sounds. Nothing leaves your Mac and there is no network access.\n\nAdd one line to your Claude preferences so Claude calls it each time it is about to give you its answer (see the README).",
+  "author": {
+    "name": "Kiran Karthik Ponnusamy",
+    "url": "https://github.com/kirankthik"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kirankthik/Voice-Announcer-for-Claude-Chat.git"
+  },
+  "homepage": "https://github.com/kirankthik/Voice-Announcer-for-Claude-Chat",
+  "support": "https://github.com/kirankthik/Voice-Announcer-for-Claude-Chat/issues",
+  "icon": "icon.png",
+  "license": "MIT",
+  "keywords": [
+    "voice",
+    "speech",
+    "text-to-speech",
+    "notifications",
+    "accessibility",
+    "read aloud"
+  ],
+  "privacy_policies": [
+    "https://github.com/kirankthik/Voice-Announcer-for-Claude-Chat/blob/main/PRIVACY.md"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.js"
+      ],
+      "env": {
+        "VA_ANNOUNCE": "${user_config.announce}",
+        "VA_READ_REPLY": "${user_config.read_reply}",
+        "VA_TEMPLATE": "${user_config.announcement}",
+        "VA_VOICE": "${user_config.voice}",
+        "VA_RATE": "${user_config.rate}",
+        "VA_CHIME": "${user_config.chime}",
+        "VA_MAX_WORDS": "${user_config.max_words}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "announce_reply",
+      "description": "Speaks \"Claude has responded to chat titled …\" and/or reads the reply aloud on your Mac."
+    },
+    {
+      "name": "stop_speaking",
+      "description": "Stops any announcement or read-aloud that is playing."
+    }
+  ],
+  "compatibility": {
+    "platforms": [
+      "darwin"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "user_config": {
+    "announce": {
+      "type": "boolean",
+      "title": "Announce when Claude replies",
+      "description": "Say \"Claude has responded to chat titled …\" when a reply is ready.",
+      "default": true
+    },
+    "read_reply": {
+      "type": "boolean",
+      "title": "Read the reply aloud",
+      "description": "After the announcement, read Claude's reply aloud, including any questions it asks you.",
+      "default": false
+    },
+    "announcement": {
+      "type": "string",
+      "title": "Announcement wording",
+      "description": "What to say when a reply is ready. {title} is replaced with the chat's title.",
+      "default": "Claude has responded to chat titled {title}"
+    },
+    "voice": {
+      "type": "string",
+      "title": "Voice (optional)",
+      "description": "A Mac voice name such as Samantha, Daniel or Karen. Leave blank for your system voice (System Settings > Accessibility > Spoken Content).",
+      "default": ""
+    },
+    "rate": {
+      "type": "number",
+      "title": "Speaking speed (words per minute)",
+      "description": "0 keeps the voice's normal speed. Try 200 to 260 to speed it up.",
+      "default": 0,
+      "min": 0,
+      "max": 500
+    },
+    "chime": {
+      "type": "string",
+      "title": "Chime before speaking",
+      "description": "A Mac alert sound to play first: Glass, Ping, Hero, Submarine, Tink, Pop, Purr. Type none for no chime.",
+      "default": "Glass"
+    },
+    "max_words": {
+      "type": "number",
+      "title": "Longest read-aloud (words)",
+      "description": "Longer replies are condensed for listening; the full reply stays in the chat. 0 means no limit.",
+      "default": 200,
+      "min": 0,
+      "max": 5000
+    }
+  }
+}

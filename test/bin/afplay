@@ -1,0 +1,2 @@
+#!/bin/bash
+printf 'AFPLAY %s\n' "$*" >> "${MOCK_LOG:?}"
