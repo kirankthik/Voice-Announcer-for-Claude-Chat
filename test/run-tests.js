@@ -102,8 +102,8 @@ async function test(name, fn) {
     const names = list.result.tools.map((t) => t.name);
     assert.deepEqual(names, ['announce_reply', 'stop_speaking']);
     const ann = list.result.tools[0];
-    assert.deepEqual(Object.keys(ann.inputSchema.properties), ['chat_title', 'needs_input']);
-    assert.deepEqual(ann.inputSchema.required, ['chat_title']);
+    assert.deepEqual(Object.keys(ann.inputSchema.properties), ['chat_title', 'needs_input', 'spoken_text']);
+    assert.deepEqual(ann.inputSchema.required, ['chat_title', 'spoken_text']);
     assert.match(ann.description, /Claude has responded to chat titled Lisbon trip plan/);
     assert.equal(ann.annotations.readOnlyHint, true);
 
@@ -127,7 +127,7 @@ async function test(name, fn) {
     await sleep(400);
     assert.deepEqual(s.calls(), [
       `AFPLAY ${path.join(T, 'Ding.aiff')}`,
-      'SAY args=[-v Samantha -r 230] text=[Claude has responded to chat titled Budget for Q4. It needs your input.]',
+      'SAY args=[-v Samantha -r 230] text=[Claude has responded to chat titled Budget for Q4. It has a question for you.]',
     ]);
     await s.stop();
   });

@@ -15,7 +15,7 @@ const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const readline = require('node:readline');
 
-const SERVER = { name: 'voice-announcer', title: 'Voice Announcer for Claude Chat', version: '1.0.2' };
+const SERVER = { name: 'voice-announcer', title: 'Voice Announcer for Claude Chat', version: '1.0.3' };
 
 // ---------------------------------------------------------------- settings --
 
@@ -108,7 +108,7 @@ function cleanTitle(raw) {
 
 function announcement(title, needsInput) {
   let line = CONFIG.template.replace(/\{title\}/g, title).trim();
-  if (needsInput) line = `${line.replace(/[.!?\s]+$/, '')}. It needs your input.`;
+  if (needsInput) line = `${line.replace(/[.!?\s]+$/, '')}. It has a question for you.`;
   return line;
 }
 
@@ -251,21 +251,23 @@ function toolList() {
     },
     needs_input: {
       type: 'boolean',
-      description: 'true if the answer you are about to write asks the user something or waits for their decision or approval; otherwise false.',
+      description:
+        'true only if you cannot go on until the user answers: you asked them a question you need answered, or need their decision or approval. ' +
+        'false for a finished answer, including one that just offers optional next steps ("want me to…?").',
     },
   };
-  const required = ['chat_title'];
-  if (CONFIG.readReply) {
-    properties.spoken_text = {
-      type: 'string',
-      description:
-        (CONFIG.maxWords > 0
-          ? `The answer you are about to write, rewritten for listening, under ${CONFIG.maxWords} words. If it is longer, give the key points and say the details are in the chat.`
-          : 'The whole answer you are about to write, rewritten for listening.') +
-        ' Use plain spoken sentences: no markdown, code, tables, links or emoji. Always include, word for word, any question you are asking the user.',
-    };
-    required.push('spoken_text');
-  }
+  // spoken_text is always in the schema: a chat that listed this tool before read-aloud was
+  // switched on keeps the schema it first saw, so it must already carry this field.
+  properties.spoken_text = {
+    type: 'string',
+    description:
+      (CONFIG.maxWords > 0
+        ? `The answer you are about to write, rewritten for listening, under ${CONFIG.maxWords} words. If it is longer, give the key points and say the details are in the chat.`
+        : 'The whole answer you are about to write, rewritten for listening.') +
+      ' Use plain spoken sentences: no markdown, code, tables, links or emoji. Always include, word for word, any question you are asking the user.' +
+      ' Always send it: the user can switch read-aloud on at any time, and it is ignored while read-aloud is off.',
+  };
+  const required = ['chat_title', 'spoken_text'];
 
   const quiet = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
   return [
@@ -308,7 +310,10 @@ function callTool(name, rawArgs) {
   if (CONFIG.readReply) {
     const body = capWords(forSpeech(args.spoken_text), CONFIG.maxWords);
     if (body) lines.push(body);
-    else if (!CONFIG.announce) lines.push(announcement(title, needsInput));
+    else {
+      log('Read-aloud is on but Claude sent no spoken_text; start a new chat so it picks up the current tool.');
+      if (!CONFIG.announce) lines.push(announcement(title, needsInput));
+    }
   }
   enqueue([chime, ...lines.map((line) => () => speak(line))]);
   return result('Queued to speak on the Mac. Now write your answer to the user as usual.');
