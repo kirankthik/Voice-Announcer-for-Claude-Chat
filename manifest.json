@@ -2,9 +2,9 @@
   "manifest_version": "0.3",
   "name": "voice-announcer",
   "display_name": "Voice Announcer for Claude Chat",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Hear when Claude finishes: a spoken \"Claude has responded to chat titled …\", and optionally the reply read aloud, on your Mac.",
-  "long_description": "Send a prompt, walk away, and your Mac tells you when Claude is done.\n\n- **Announce**: says \"Claude has responded to chat titled …\" (and that it needs your input when Claude asked you something).\n- **Read aloud**: optionally reads the reply, and any questions Claude asked, in plain spoken sentences.\n\nIt uses the Mac's built-in voice (`say`) and alert sounds. Nothing leaves your Mac and there is no network access.\n\nAdd one line to your Claude preferences so Claude calls it each time it is about to give you its answer (see the README).",
+  "long_description": "Send a prompt, walk away, and your Mac tells you when Claude is done.\n\n- **Announce**: says \"Claude has responded to chat titled …\" (and that it needs your input when Claude asked you something).\n- **Read aloud**: optionally reads the reply, and any questions Claude asked, in plain spoken sentences.\n\nIt uses the Mac's built-in voice (`say`) and alert sounds. Nothing leaves your Mac and there is no network access.\n\n**Changing settings:** click **Save** at the bottom of the settings page (you may need to scroll), or just ask Claude in a chat, for example \"turn read-aloud on\".\n\nAdd one line to your Claude preferences so Claude calls it each time it is about to give you its answer (see the README).",
   "author": {
     "name": "Kiran Karthik Ponnusamy",
     "url": "https://github.com/kirankthik"
@@ -74,7 +74,7 @@
     "announce": {
       "type": "boolean",
       "title": "Announce when Claude replies",
-      "description": "Say \"Claude has responded to chat titled …\" when a reply is ready.",
+      "description": "Say \"Claude has responded to chat titled …\" when a reply is ready. Changes on this page apply only after you click Save at the bottom (scroll down if you can't see it), or just ask Claude in a chat to change a setting.",
       "default": true
     },
     "read_reply": {
@@ -118,7 +118,7 @@
     "max_words": {
       "type": "number",
       "title": "Longest read-aloud (words)",
-      "description": "Longer replies are condensed for listening; the full reply stays in the chat. 0 means no limit.",
+      "description": "Longer replies are condensed for listening; the full reply stays in the chat. 0 means no limit. Remember to click Save below to apply your changes.",
       "default": 200,
       "min": 0,
       "max": 5000

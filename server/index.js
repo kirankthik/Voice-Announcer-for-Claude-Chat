@@ -17,7 +17,7 @@ const os = require('node:os');
 const path = require('node:path');
 const readline = require('node:readline');
 
-const SERVER = { name: 'voice-announcer', title: 'Voice Announcer for Claude Chat', version: '1.0.5' };
+const SERVER = { name: 'voice-announcer', title: 'Voice Announcer for Claude Chat', version: '1.0.6' };
 
 // ---------------------------------------------------------------- settings --
 
