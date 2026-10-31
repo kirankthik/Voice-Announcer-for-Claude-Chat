@@ -1,2 +1,3 @@
 #!/bin/bash
 printf 'AFPLAY %s\n' "$*" >> "${MOCK_LOG:?}"
+if [[ "$*" == *SlowChime* ]]; then sleep 1.5; fi

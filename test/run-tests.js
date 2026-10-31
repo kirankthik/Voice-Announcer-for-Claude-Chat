@@ -25,13 +25,15 @@ const UNSET = {
   VA_MAX_WORDS: '${user_config.max_words}',
 };
 
-function start(env, { mocks = true } = {}) {
+function start(env, { mocks = true, settingsFile } = {}) {
   const log = path.join(T, `log-${Date.now()}-${Math.random().toString(36).slice(2)}.txt`);
+  const settings = settingsFile || log.replace(/\.txt$/, '-settings.json');
   fs.writeFileSync(log, '');
   const child = spawn(process.execPath, [SERVER], {
     env: {
       PATH: process.env.PATH,
       MOCK_LOG: log,
+      VA_SETTINGS_FILE: settings,
       ...(mocks ? { VA_SAY_BIN: SAY, VA_AFPLAY_BIN: AFPLAY, VA_IOREG_BIN: IOREG } : {}),
       ...env,
     },
@@ -101,7 +103,7 @@ async function test(name, fn) {
     assert.match(init.result.instructions, /announce_reply/);
     const list = await s.rpc('tools/list', {});
     const names = list.result.tools.map((t) => t.name);
-    assert.deepEqual(names, ['announce_reply', 'stop_speaking']);
+    assert.deepEqual(names, ['announce_reply', 'stop_speaking', 'voice_settings']);
     const ann = list.result.tools[0];
     assert.deepEqual(Object.keys(ann.inputSchema.properties), ['chat_title', 'needs_input', 'spoken_text']);
     assert.deepEqual(ann.inputSchema.required, ['chat_title', 'spoken_text']);
@@ -258,6 +260,48 @@ async function test(name, fn) {
     assert.ok(!/Stopped speaking/.test(off.stderr()), 'should keep speaking when the setting is off');
     await off.rpc('tools/call', { name: 'stop_speaking', arguments: {} });
     await off.stop();
+  });
+
+  await test('settings changed by asking Claude apply at once, persist, and yield to the app settings', async () => {
+    const file = path.join(T, 'log-saved-settings.json');
+    fs.rmSync(file, { force: true });
+    const app = { VA_CHIME: 'none', VA_READ_REPLY: 'false' };
+    const s = start(app, { settingsFile: file });
+    await handshake(s);
+    const shown = await s.rpc('tools/call', { name: 'voice_settings', arguments: {} });
+    assert.match(shown.result.content[0].text, /Read the reply aloud: off/);
+    let r = await s.rpc('tools/call', { name: 'announce_reply', arguments: { chat_title: 'One', spoken_text: 'First reply.' } });
+    assert.match(r.result.content[0].text, /read-aloud is off/);
+    const changed = await s.rpc('tools/call', { name: 'voice_settings', arguments: { read_reply: true, voice: 'Daniel' } });
+    assert.match(changed.result.content[0].text, /Updated read_reply, voice and saved/);
+    r = await s.rpc('tools/call', { name: 'announce_reply', arguments: { chat_title: 'Two', spoken_text: 'Second reply.' } });
+    assert.match(r.result.content[0].text, /the announcement and the reply on the Mac\./);
+    await sleep(500);
+    assert.ok(s.calls().includes('SAY args=[-v Daniel] text=[Second reply.]'), s.calls().join('\n'));
+    await s.stop();
+    // A restart keeps the change...
+    const again = start(app, { settingsFile: file });
+    await handshake(again);
+    assert.match((await again.rpc('tools/call', { name: 'voice_settings', arguments: {} })).result.content[0].text, /Read the reply aloud: on/);
+    await again.stop();
+    // ...until the user changes the extension's settings screen, which wins.
+    const edited = start({ ...app, VA_RATE: '220' }, { settingsFile: file });
+    await handshake(edited);
+    assert.match((await edited.rpc('tools/call', { name: 'voice_settings', arguments: {} })).result.content[0].text, /Read the reply aloud: off/);
+    await edited.stop();
+  });
+
+  await test('speech starts over the chime instead of after it', async () => {
+    const slowChime = path.join(T, 'log-SlowChime.aiff');
+    fs.writeFileSync(slowChime, 'x');
+    const s = start({ VA_CHIME: slowChime });
+    await handshake(s);
+    await s.rpc('tools/call', { name: 'announce_reply', arguments: { chat_title: 'Quick', spoken_text: 'x' } });
+    await sleep(700); // the stand-in chime lasts 1.5 s
+    const calls = s.calls();
+    assert.equal(calls[0], `AFPLAY ${slowChime}`);
+    assert.ok(calls.some((c) => c.includes('Quick')), 'speech should start before the chime ends: ' + calls.join(' | '));
+    await s.stop();
   });
 
   await test('both options off: silent, tool says so', async () => {

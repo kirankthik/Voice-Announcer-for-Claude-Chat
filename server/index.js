@@ -13,9 +13,11 @@
 
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const readline = require('node:readline');
 
-const SERVER = { name: 'voice-announcer', title: 'Voice Announcer for Claude Chat', version: '1.0.4' };
+const SERVER = { name: 'voice-announcer', title: 'Voice Announcer for Claude Chat', version: '1.0.5' };
 
 // ---------------------------------------------------------------- settings --
 
@@ -39,7 +41,7 @@ const num = (name, fallback, lo, hi) => {
 };
 const str = (name, fallback) => setting(name) ?? fallback;
 
-const CONFIG = {
+const FROM_APP = {
   announce: bool('VA_ANNOUNCE', true),
   readReply: bool('VA_READ_REPLY', false),
   template: str('VA_TEMPLATE', 'Claude has responded to chat titled {title}'),
@@ -50,6 +52,35 @@ const CONFIG = {
   stopOnActivity: bool('VA_STOP_ON_ACTIVITY', true),
 };
 
+// Settings changed by asking Claude ("turn read-aloud on") apply at once and are saved here.
+// If the user later changes the extension's settings screen, those win and this file resets.
+const SETTINGS_FILE =
+  process.env.VA_SETTINGS_FILE ||
+  path.join(os.homedir(), 'Library', 'Application Support', 'Voice Announcer for Claude Chat', 'settings.json');
+const CONFIG = { ...FROM_APP };
+let overrides = {};
+(function loadOverrides() {
+  try {
+    const saved = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+    if (JSON.stringify(saved.fromApp) === JSON.stringify(FROM_APP) && saved.overrides && typeof saved.overrides === 'object') {
+      overrides = saved.overrides;
+      Object.assign(CONFIG, overrides);
+    }
+  } catch {
+    /* no saved changes yet */
+  }
+})();
+function saveOverrides() {
+  try {
+    fs.mkdirSync(path.dirname(SETTINGS_FILE), { recursive: true });
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify({ fromApp: FROM_APP, overrides }, null, 2));
+    return true;
+  } catch (err) {
+    log(`Couldn't save settings: ${err.message}`);
+    return false;
+  }
+}
+
 // Overridable only for testing; Claude Desktop never sets these.
 const SAY = process.env.VA_SAY_BIN || '/usr/bin/say';
 const AFPLAY = process.env.VA_AFPLAY_BIN || '/usr/bin/afplay';
@@ -57,6 +88,8 @@ const CAN_SPEAK = process.platform === 'darwin' || Boolean(process.env.VA_SAY_BI
 const MAX_WAITING = 8;
 const IOREG = process.env.VA_IOREG_BIN || '/usr/sbin/ioreg';
 const ACTIVITY_POLL_MS = 250;
+// Speech starts this long after the chime does, overlapping its tail, instead of waiting for it to end.
+const CHIME_LEAD_MS = 250;
 
 // ------------------------------------------------------------ text helpers --
 
@@ -119,7 +152,7 @@ function announcement(title, needsInput) {
 
 let waiting = []; // jobs not yet started; each job is a list of steps
 let busy = false;
-let current = null; // the running say/afplay process
+const running = new Set(); // say/afplay processes now playing
 let generation = 0; // bumped by stop_speaking so in-flight jobs give up
 let voiceUsable = true;
 
@@ -136,13 +169,13 @@ function run(command, args, input) {
       resolve({ ok: false, error: err.message });
       return;
     }
-    current = child;
+    running.add(child);
     let stderr = '';
     let settled = false;
     const settle = (value) => {
       if (settled) return;
       settled = true;
-      if (current === child) current = null;
+      running.delete(child);
       resolve(value);
     };
     child.stderr.on('data', (chunk) => {
@@ -150,7 +183,7 @@ function run(command, args, input) {
     });
     child.on('error', (err) => settle({ ok: false, error: err.message }));
     child.on('exit', (code, signal) => {
-      if (current === child) current = null;
+      running.delete(child);
       // 'close' normally follows at once; don't hang on pipes something else still holds.
       setTimeout(() => settle({ ok: code === 0, code, signal, error: stderr.trim() }), 250);
     });
@@ -185,7 +218,9 @@ async function chime() {
     chimeWarned = true;
     return;
   }
-  await run(AFPLAY, [file], '');
+  // Don't wait for the whole chime: start speaking over its tail.
+  const playing = run(AFPLAY, [file], '');
+  await Promise.race([playing, new Promise((r) => setTimeout(r, CHIME_LEAD_MS))]);
 }
 
 // ------------------------------------------------- stop when the user is active --
@@ -270,12 +305,12 @@ function enqueue(job) {
 }
 
 function stopAll() {
-  const hadSomething = Boolean(current) || waiting.length > 0;
+  const hadSomething = running.size > 0 || waiting.length > 0;
   generation += 1;
   waiting = [];
-  if (current) {
+  for (const child of running) {
     try {
-      current.kill('SIGTERM');
+      child.kill('SIGTERM');
     } catch {
       /* already gone */
     }
@@ -343,7 +378,76 @@ function toolList() {
       inputSchema: { type: 'object', properties: {}, additionalProperties: false },
       annotations: { title: 'Stop speaking', ...quiet, idempotentHint: true },
     },
+    {
+      name: 'voice_settings',
+      title: 'Voice settings',
+      description:
+        'Shows or changes Voice Announcer settings, which take effect at once and are saved. Call it with no arguments to see the current settings; ' +
+        'when the user asks to change one (for example "turn read-aloud on", "use the Daniel voice", "no chime"), pass only what they asked to change and tell them the result.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          announce: { type: 'boolean', description: 'Say "Claude has responded to chat titled …" when a reply is ready.' },
+          read_reply: { type: 'boolean', description: 'Read the reply aloud.' },
+          stop_on_activity: { type: 'boolean', description: 'Stop speaking when the user presses a key, clicks or moves the mouse.' },
+          voice: { type: 'string', description: 'A Mac voice name such as Samantha or Daniel; "" for the system voice.' },
+          rate: { type: 'number', description: 'Words per minute; 0 for the normal speed.' },
+          chime: { type: 'string', description: 'A Mac alert sound such as Glass, Ping, Hero, Tink or Pop, or "none".' },
+          max_words: { type: 'number', description: 'Longest read-aloud in words; 0 for no limit.' },
+          announcement: { type: 'string', description: 'Announcement wording; {title} becomes the chat title.' },
+        },
+        additionalProperties: false,
+      },
+      annotations: { title: 'Voice settings', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    },
   ];
+}
+
+const SETTING_KEYS = {
+  announce: ['announce', 'boolean'],
+  read_reply: ['readReply', 'boolean'],
+  stop_on_activity: ['stopOnActivity', 'boolean'],
+  voice: ['voice', 'string'],
+  rate: ['rate', 'number', 0, 720],
+  chime: ['chime', 'string'],
+  max_words: ['maxWords', 'number', 0, 5000],
+  announcement: ['template', 'string'],
+};
+
+function describeSettings() {
+  const onOff = (v) => (v ? 'on' : 'off');
+  return [
+    `Announce: ${onOff(CONFIG.announce)} ("${CONFIG.template}")`,
+    `Read the reply aloud: ${onOff(CONFIG.readReply)}${CONFIG.readReply ? ` (up to about ${CONFIG.maxWords || 'unlimited'} words)` : ''}`,
+    `Stop when the user uses the Mac: ${onOff(CONFIG.stopOnActivity)}`,
+    `Voice: ${CONFIG.voice || 'system voice'}; speed: ${CONFIG.rate || 'normal'}; chime: ${CONFIG.chime || 'none'}`,
+  ].join('\n');
+}
+
+function changeSettings(args) {
+  const changed = [];
+  for (const [key, value] of Object.entries(args)) {
+    const spec = SETTING_KEYS[key];
+    if (!spec) continue;
+    const [field, type, lo, hi] = spec;
+    let v = value;
+    if (type === 'boolean') v = value === true || value === 'true';
+    else if (type === 'number') {
+      v = Number(value);
+      if (!Number.isFinite(v)) continue;
+      v = Math.min(hi, Math.max(lo, Math.round(v)));
+    } else v = String(value ?? '').trim();
+    if (field === 'template' && !v) v = FROM_APP.template;
+    if (field === 'voice') voiceUsable = true;
+    CONFIG[field] = v;
+    overrides[field] = v;
+    changed.push(key);
+  }
+  if (!changed.length) return result(`Current Voice Announcer settings:\n${describeSettings()}`);
+  const saved = saveOverrides();
+  return result(
+    `Updated ${changed.join(', ')}${saved ? ' and saved' : ' (applies until Claude Desktop restarts; saving failed)'}. Now:\n${describeSettings()}`,
+  );
 }
 
 const result = (text, isError = false) => ({
@@ -354,6 +458,7 @@ const result = (text, isError = false) => ({
 function callTool(name, rawArgs) {
   const args = rawArgs && typeof rawArgs === 'object' ? rawArgs : {};
   if (name === 'stop_speaking') return result(stopAll() ? 'Stopped.' : 'Nothing was playing.');
+  if (name === 'voice_settings') return changeSettings(args);
   if (name !== 'announce_reply') return result(`Unknown tool: ${name}`, true);
   if (!CAN_SPEAK) return result('Voice Announcer only works on macOS, so nothing was spoken.', true);
   if (!CONFIG.announce && !CONFIG.readReply) {
@@ -373,7 +478,10 @@ function callTool(name, rawArgs) {
     }
   }
   enqueue([chime, ...lines.map((line) => () => speak(line))]);
-  return result('Queued to speak on the Mac. Now write your answer to the user as usual.');
+  const readingReply = CONFIG.readReply && lines.length > (CONFIG.announce ? 1 : 0);
+  const what = [CONFIG.announce && 'the announcement', readingReply && 'the reply'].filter(Boolean).join(' and ') || 'the announcement';
+  const note = CONFIG.readReply ? (readingReply ? '' : ' (read-aloud is on, but no spoken_text was sent)') : ' (read-aloud is off)';
+  return result(`Queued to speak ${what} on the Mac${note}. Now write your answer to the user as usual.`);
 }
 
 // ---------------------------------------------------------------- JSON-RPC --

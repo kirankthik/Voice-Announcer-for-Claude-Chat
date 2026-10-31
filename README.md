@@ -14,7 +14,7 @@ It is a community extension for the Claude Desktop app on macOS. It isn't made o
 ## Install
 
 1. Download [`voice-announcer.mcpb`](voice-announcer.mcpb) on your Mac.
-2. Double-click it, or in Claude Desktop open **Settings > Extensions > Advanced settings > Install Extension…** and choose the file. To update, install a newer file the same way; it replaces the old version.
+2. Double-click it, or in Claude Desktop open **Settings > Extensions > Advanced settings > Install Extension…** and choose the file. To update, install a newer file the same way; it replaces the old version and keeps your settings.
 3. Pick your options on the settings screen. You can change them later under **Settings > Extensions**.
 4. Add this to your Claude preferences (Settings, in the box that asks what personal preferences Claude should consider in responses):
 
@@ -35,6 +35,8 @@ It is a community extension for the Claude Desktop app on macOS. It isn't made o
 | Chime before speaking | Glass, Ping, Hero, Submarine, Tink, Pop, Purr, or `none` |
 | Longest read-aloud | Word budget for read-aloud; 0 means no limit |
 
+You can also just tell Claude, in any chat: "turn read-aloud on", "use the Daniel voice", "no chime". Those changes take effect at once and are saved; Claude confirms what changed. If you later change the extension's settings screen, that takes over.
+
 To hear the voices your Mac has, run `say -v '?'` in Terminal. Better voices can be downloaded in **System Settings > Accessibility > Spoken Content > System voice > Manage Voices**.
 
 ## Good to know
@@ -50,8 +52,9 @@ The extension is a small [MCP](https://modelcontextprotocol.io) server packaged 
 
 - `announce_reply` queues a chime and the spoken text, and returns at once.
 - `stop_speaking` stops whatever is playing and clears the queue.
+- `voice_settings` shows or changes the settings when you ask Claude to.
 
-Speech uses the Mac's built-in `say` command and the chime uses `afplay`. While it speaks, it checks the Mac's keyboard and mouse idle time (`ioreg`), which needs no special permission and reads no keystrokes, and stops as soon as you're active. The server is one readable file, [`server/index.js`](server/index.js), with no dependencies.
+Speech uses the Mac's built-in `say` command and the chime uses `afplay`; speech starts over the end of the chime so there's no gap. While it speaks, it checks the Mac's keyboard and mouse idle time (`ioreg`), which needs no special permission and reads no keystrokes, and stops as soon as you're active. The server is one readable file, [`server/index.js`](server/index.js), with no dependencies.
 
 ## Privacy
 

@@ -1,4 +1,4 @@
 .DS_Store
 node_modules/
-test/log-*.txt
+test/log-*
 test/Ding.aiff
